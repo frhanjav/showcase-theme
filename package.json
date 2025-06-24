@@ -1,0 +1,33 @@
+{
+  "name": "youtube-showcase",
+  "version": "1.0.0",
+  "description": "A minimal web application for showcasing YouTubers and their video links",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "dev:remote": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "tsc",
+    "db:migrate": "wrangler d1 migrations apply youtube-showcase-db",
+    "db:local": "wrangler d1 migrations apply youtube-showcase-db --local",
+    "setup": "npm run db:migrate && echo 'Database migrations applied!'",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "hono",
+    "youtube",
+    "showcase"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241218.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^4.21.0"
+  },
+  "dependencies": {
+    "hono": "^4.8.2"
+  }
+}

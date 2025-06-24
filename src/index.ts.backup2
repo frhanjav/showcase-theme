@@ -1,0 +1,124 @@
+import { Hono } from "hono";
+import { Env } from "./types";
+import {
+  corsMiddleware,
+  securityHeaders,
+  errorHandler,
+  rateLimitMiddleware,
+  authMiddleware,
+  csrfMiddleware,
+} from "./middleware";
+import auth from "./routes/auth";
+import youtubers from "./routes/youtubers";
+import videos from "./routes/videos";
+import utils from "./routes/utils";
+
+const app = new Hono<{ Bindings: Env }>();
+
+// Global middleware
+app.use("*", errorHandler());
+app.use("*", async (c, next) => {
+  const corsOrigins = c.env.CORS_ORIGINS || "http://localhost:8787";
+  return corsMiddleware(corsOrigins)(c, next);
+});
+app.use("*", securityHeaders());
+app.use("/api/*", rateLimitMiddleware());
+app.use("/api/*", csrfMiddleware());
+app.use("/api/*", authMiddleware());
+
+// API routes
+app.route("/api", auth);
+app.route("/api/youtubers", youtubers);
+app.route("/api/videos", videos);
+app.route("/api", utils);
+
+// Static file routes - serve from public directory
+// (For Cloudflare Workers deployment, these files will be bundled)
+app.get("/static/*", async (c) => {
+  const path = c.req.path.replace("/static/", "");
+  // In production, static files would be served by Cloudflare's CDN
+  // For development, we'll return a simple response
+  return c.text("Static files not configured for local development", 404);
+});
+
+// HTML page routes
+app.get("/", async (c) => {
+  // For development, serve a simple HTML response
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Showcase</title>
+</head>
+<body>
+    <h1>YouTube Showcase</h1>
+    <p>Welcome to the YouTube Showcase app!</p>
+    <p><a href="/youtubers">View YouTubers</a></p>
+    <p><a href="/videos">View Videos</a></p>
+</body>
+</html>`;
+  return c.html(html);
+});
+
+app.get("/youtubers", async (c) => {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTubers - YouTube Showcase</title>
+</head>
+<body>
+    <h1>YouTubers</h1>
+    <p><a href="/">← Back</a></p>
+    <div id="youtubers">Loading...</div>
+    <script>
+        fetch('/api/youtubers')
+          .then(r => r.json())
+          .then(data => {
+            document.getElementById('youtubers').innerHTML = 
+              data.youtubers ? data.youtubers.map(y => 
+                \`<div><h3>\${y.name}</h3></div>\`
+              ).join('') : 'No YouTubers found';
+          })
+          .catch(e => {
+            document.getElementById('youtubers').innerHTML = 'Error loading YouTubers';
+          });
+    </script>
+</body>
+</html>`;
+  return c.html(html);
+});
+
+app.get("/videos", async (c) => {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Videos - YouTube Showcase</title>
+</head>
+<body>
+    <h1>Videos</h1>
+    <p><a href="/">← Back</a></p>
+    <div id="videos">Loading...</div>
+    <script>
+        fetch('/api/videos')
+          .then(r => r.json())
+          .then(data => {
+            document.getElementById('videos').innerHTML = 
+              data.videos ? data.videos.map(v => 
+                \`<div><h3>\${v.title}</h3><p><a href="\${v.url}" target="_blank">\${v.url}</a></p></div>\`
+              ).join('') : 'No videos found';
+          })
+          .catch(e => {
+            document.getElementById('videos').innerHTML = 'Error loading videos';
+          });
+    </script>
+</body>
+</html>`;
+  return c.html(html);
+});
+
+export default app;

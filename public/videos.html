@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Videos - YouTube Showcase</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Videos</h1>
+        <div class="header-actions">
+          <button class="theme-toggle" onclick="toggleTheme()">🌓</button>
+          <a href="/" class="btn btn-primary">Home</a>
+          <a href="/youtubers" class="btn btn-primary">YouTubers</a>
+          <button class="btn btn-success" onclick="showAddModal()" id="addBtn">
+            Add Video
+          </button>
+        </div>
+      </div>
+
+      <div id="statusMessage"></div>
+
+      <div id="videosGrid" class="videos-grid">
+        <!-- Videos will be loaded here -->
+      </div>
+
+      <div id="loadingState" class="empty-state">
+        <h3>Loading Videos...</h3>
+      </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="videoModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title" id="modalTitle">Add Video</h2>
+          <button class="close-btn" onclick="closeModal()">&times;</button>
+        </div>
+
+        <form id="videoForm" enctype="multipart/form-data">
+          <div class="form-group">
+            <label class="form-label" for="url">Video URL *</label>
+            <input
+              type="url"
+              id="url"
+              class="form-input"
+              required
+              placeholder="https://youtube.com/watch?v=..."
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="title">Title</label>
+            <input
+              type="text"
+              id="title"
+              class="form-input"
+              placeholder="Auto-extracted from URL if empty"
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="description">Description</label>
+            <textarea
+              id="description"
+              class="form-textarea"
+              placeholder="Auto-extracted from URL if empty"
+            ></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="custom_thumbnail"
+              >Custom Thumbnail</label
+            >
+            <input
+              type="file"
+              id="custom_thumbnail"
+              class="form-input"
+              accept="image/*"
+            />
+            <small style="opacity: 0.7"
+              >Leave empty to auto-extract from URL</small
+            >
+            <img
+              id="thumbnailPreview"
+              class="image-preview"
+              style="display: none"
+            />
+          </div>
+
+          <div style="display: flex; gap: 1rem; margin-top: 1.5rem">
+            <button type="submit" class="btn btn-success" id="saveBtn">
+              Save
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              onclick="closeModal()"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="/static/videos.js"></script>
+  </body>
+</html>

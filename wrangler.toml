@@ -1,0 +1,79 @@
+name = "youtube-showcase"
+main = "src/index.ts"
+compatibility_date = "2024-12-18"
+compatibility_flags = ["nodejs_compat"]
+
+[env.production]
+name = "youtube-showcase-prod"
+
+# Production KV namespace
+[[env.production.kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "your-production-kv-namespace-id"
+
+# Production D1 database
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "youtube-showcase-db-prod"
+database_id = "your-production-d1-database-id"
+
+# Production R2 bucket
+[[env.production.r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "youtube-showcase-images-prod"
+
+[env.staging]
+name = "youtube-showcase-staging"
+
+# Staging KV namespace
+[[env.staging.kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "your-staging-kv-namespace-id"
+
+# Staging D1 database
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "youtube-showcase-db-staging"
+database_id = "your-staging-d1-database-id"
+
+# Staging R2 bucket
+[[env.staging.r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "youtube-showcase-images-staging"
+
+# Development/Local resources
+[[d1_databases]]
+binding = "DB"
+database_name = "youtube-showcase-db"
+database_id = "your-d1-database-id"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "your-kv-namespace-id"
+preview_id = "your-preview-kv-namespace-id"
+
+[[r2_buckets]]
+binding = "IMAGES_BUCKET"
+bucket_name = "youtube-showcase-images"
+preview_bucket_name = "youtube-showcase-images-preview"
+
+# Environment variables
+[vars]
+ENVIRONMENT = "development"
+CORS_ORIGINS = "http://localhost:8787,https://your-domain.com"
+RATE_LIMIT_MAX_ATTEMPTS = "3"
+RATE_LIMIT_WINDOW_MS = "900000"
+AUTO_EXPORT_INTERVAL_DAYS = "15"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+CORS_ORIGINS = "https://your-domain.com"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+CORS_ORIGINS = "https://staging.your-domain.com"
+
+# Secrets - set these using wrangler secret put
+# ADMIN_PASSWORD_HASH - bcrypt hash of admin password
+# CSRF_SECRET_KEY - random 32+ character string for CSRF token generation

@@ -150,4 +150,94 @@ utils.get("/health", async (c) => {
   }
 });
 
+// Fix image URLs in database (migration endpoint)
+utils.get("/fix-image-urls", async (c) => {
+  try {
+    const db = new DatabaseService(c.env.DB);
+
+    // Get all youtubers with old URLs
+    const youtubers = await db.getAllYouTubers();
+    const updates = [];
+
+    for (const youtuber of youtubers) {
+      if (
+        youtuber.image_url &&
+        youtuber.image_url.includes("your-r2-domain.com")
+      ) {
+        // Extract the path from the old URL (e.g., "youtubers/1750768269282_yfq9jknmoah.png")
+        const urlParts = youtuber.image_url.split("/");
+        const pathParts = urlParts.slice(3); // Remove https, empty, your-r2-domain.com
+        const filePath = pathParts.join("/");
+        const newUrl = `/images/${filePath}`;
+
+        await c.env.DB.prepare(
+          "UPDATE youtubers SET image_url = ? WHERE youtuber_id = ?"
+        )
+          .bind(newUrl, youtuber.youtuber_id)
+          .run();
+
+        updates.push({
+          id: youtuber.youtuber_id,
+          name: youtuber.name,
+          oldUrl: youtuber.image_url,
+          newUrl: newUrl,
+        });
+      }
+    }
+
+    // Also fix videos if they have thumbnail URLs
+    const videos = await db.getAllVideos();
+    for (const video of videos) {
+      if (
+        video.thumbnail_url &&
+        video.thumbnail_url.includes("your-r2-domain.com")
+      ) {
+        const urlParts = video.thumbnail_url.split("/");
+        const pathParts = urlParts.slice(3); // Remove https, empty, your-r2-domain.com
+        const filePath = pathParts.join("/");
+        const newUrl = `/images/${filePath}`;
+
+        await c.env.DB.prepare(
+          "UPDATE videos SET thumbnail_url = ? WHERE video_id = ?"
+        )
+          .bind(newUrl, video.video_id)
+          .run();
+
+        updates.push({
+          id: video.video_id,
+          title: video.title,
+          oldUrl: video.thumbnail_url,
+          newUrl: newUrl,
+        });
+      }
+    }
+
+    return c.json({
+      message: "Image URLs updated successfully",
+      updates: updates,
+      count: updates.length,
+    });
+  } catch (error) {
+    console.error("Error fixing image URLs:", error);
+    return c.json({ error: "Failed to fix image URLs" }, 500);
+  }
+});
+
+// Debug: List R2 bucket contents
+utils.get("/debug-r2", async (c) => {
+  try {
+    const objects = await c.env.IMAGES_BUCKET.list();
+    return c.json({
+      objects: objects.objects.map((obj) => ({
+        key: obj.key,
+        size: obj.size,
+        uploaded: obj.uploaded,
+      })),
+    });
+  } catch (error) {
+    console.error("Error listing R2 objects:", error);
+    return c.json({ error: "Failed to list R2 objects" }, 500);
+  }
+});
+
 export default utils;

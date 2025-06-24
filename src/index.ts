@@ -71,6 +71,38 @@ app.use("/api/videos", async (c, next) => {
 
 app.use("/api/utils/*", authMiddleware());
 
+// Serve images from R2 storage
+app.get("/images/:folder/:filename", async (c) => {
+  try {
+    const folder = c.req.param("folder");
+    const filename = c.req.param("filename");
+    const imagePath = `${folder}/${filename}`;
+
+    if (!folder || !filename) {
+      return c.text("Image not found", 404);
+    }
+
+    const imageObject = await c.env.IMAGES_BUCKET.get(imagePath);
+
+    if (!imageObject) {
+      return c.text("Image not found", 404);
+    }
+
+    const imageData = await imageObject.arrayBuffer();
+    const contentType = imageObject.httpMetadata?.contentType || "image/jpeg";
+
+    return new Response(imageData, {
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=31536000", // Cache for 1 year
+      },
+    });
+  } catch (error) {
+    console.error("Error serving image:", error);
+    return c.text("Error serving image", 500);
+  }
+});
+
 // Static file serving
 app.get("/", async (c) => {
   const html = `<!DOCTYPE html>

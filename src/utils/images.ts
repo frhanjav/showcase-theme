@@ -51,8 +51,8 @@ export async function uploadImageToR2(
       },
     });
 
-    // Return the URL (you'll need to configure your R2 bucket to be publicly accessible)
-    const url = `https://your-r2-domain.com/${filename}`;
+    // Return the URL pointing to our image serving endpoint
+    const url = `/images/${filename}`;
 
     return {
       success: true,
@@ -109,7 +109,7 @@ export async function uploadImageFromUrl(
       },
     });
 
-    const url = `https://your-r2-domain.com/${filename}`;
+    const url = `/images/${filename}`;
 
     return {
       success: true,

@@ -128,7 +128,7 @@ export function csrfMiddleware() {
       const path = c.req.path;
 
       // Skip CSRF check for auth endpoint (it has its own CSRF handling)
-      if (path === "/api/auth") {
+      if (path.startsWith("/api/auth")) {
         await next();
         return;
       }

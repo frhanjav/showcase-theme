@@ -911,9 +911,11 @@ async function login(password) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-CSRF-Token": csrfData.csrfToken,
       },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ 
+        password: password,
+        csrf_token: csrfData.csrfToken
+      }),
     });
 
     const data = await response.json();
@@ -1552,7 +1554,7 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 // Test page to debug issues
-app.get('/test', async (c) => {
+app.get("/test", async (c) => {
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1657,7 +1659,7 @@ app.get('/test', async (c) => {
     </script>
 </body>
 </html>`;
-  
+
   return c.html(html);
 });
 

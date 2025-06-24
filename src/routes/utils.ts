@@ -3,8 +3,16 @@ import { Env } from "../types";
 import { DatabaseService } from "../utils/database";
 import { extractOpenGraph, isValidUrl } from "../utils/openGraph";
 import { uploadImageToR2 } from "../utils/images";
+import { hashPassword } from "../utils/auth";
 
 const utils = new Hono<{ Bindings: Env }>();
+
+// Generate password hash (for development only)
+utils.get("/hash-password/:password", async (c) => {
+  const password = c.req.param("password");
+  const hash = await hashPassword(password);
+  return c.json({ password, hash });
+});
 
 // Extract Open Graph data from URL
 utils.post("/extract-og", async (c) => {

@@ -15,9 +15,9 @@ let csrfToken = null;
 
 async function getCSRFToken() {
   try {
-    const response = await fetch("/api/csrf-token");
+    const response = await fetch("/api/auth/csrf");
     const data = await response.json();
-    return data.csrf_token;
+    return data.csrfToken;
   } catch (error) {
     console.error("Error getting CSRF token:", error);
     return null;
@@ -44,7 +44,7 @@ async function login() {
       throw new Error("Failed to get CSRF token");
     }
 
-    const response = await fetch("/api/auth", {
+    const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

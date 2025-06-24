@@ -44,9 +44,17 @@ export async function verifyCSRFToken(
     if (Date.now() - timestamp > maxAge) return false;
 
     // Recreate the expected token and verify
-    const expectedToken = await createCSRFToken(secret, timestamp);
-    return expectedToken === token;
-  } catch {
+    const payload = `${tokenPart}:${timestamp}`;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(payload + secret);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const expectedHash = hashArray
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    return expectedHash === hash;
+  } catch (error) {
     return false;
   }
 }

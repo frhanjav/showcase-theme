@@ -8,10 +8,10 @@ import { recordFailedAttempt, resetRateLimit } from "../utils/rateLimit";
 const auth = new Hono<{ Bindings: Env }>();
 
 // Get CSRF token
-auth.get("/csrf-token", async (c) => {
+auth.get("/csrf", async (c) => {
   try {
     const token = await getCSRFToken(c);
-    return c.json({ csrf_token: token });
+    return c.json({ csrfToken: token });
   } catch (error) {
     console.error("Error generating CSRF token:", error);
     return c.json({ error: "Failed to generate CSRF token" }, 500);
@@ -19,7 +19,7 @@ auth.get("/csrf-token", async (c) => {
 });
 
 // Authenticate with password
-auth.post("/auth", async (c) => {
+auth.post("/login", async (c) => {
   try {
     const body = await c.req.json();
     const { password, csrf_token } = body;

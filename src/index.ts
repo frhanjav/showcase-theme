@@ -48,14 +48,28 @@ app.use("/api/*", rateLimitMiddleware());
 // CSRF protection for state-changing operations
 app.use("/api/*", csrfMiddleware());
 
-// Authentication middleware for protected routes
-app.use("*", authMiddleware());
-
 // API Routes
 app.route("/api/auth", authRouter);
 app.route("/api/youtubers", youtubersRouter);
 app.route("/api/videos", videosRouter);
 app.route("/api/utils", utilsRouter);
+
+// Authentication middleware for protected routes (after auth routes)
+app.use("/api/youtubers", async (c, next) => {
+  if (c.req.method !== "GET") {
+    return authMiddleware()(c, next);
+  }
+  return next();
+});
+
+app.use("/api/videos", async (c, next) => {
+  if (c.req.method !== "GET") {
+    return authMiddleware()(c, next);
+  }
+  return next();
+});
+
+app.use("/api/utils/*", authMiddleware());
 
 // Static file serving
 app.get("/", async (c) => {
@@ -769,7 +783,43 @@ body {
   .card-actions {
     flex-direction: column;
   }
-}`;
+}
+
+/* Test Page Styles */
+.test-page {
+  font-family: Arial, sans-serif;
+  padding: 2rem;
+}
+
+.test-page .btn {
+  padding: 1rem;
+  margin: 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.test-page .modal {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 2rem;
+  border: 1px solid #ccc;
+  z-index: 1000;
+}
+
+[data-theme="dark"] {
+  background: #333;
+  color: white;
+}
+
+[data-theme="dark"] .modal {
+  background: #444;
+  color: white;
+}
+`;
 
   return c.text(css, 200, {
     "Content-Type": "text/css",
@@ -896,7 +946,7 @@ function showStatus(message, type) {
   const statusElement = document.getElementById("statusMessage");
   if (statusElement) {
     statusElement.textContent = message;
-    statusElement.className = \`status-message status-\${type} show\`;
+    statusElement.className = "status-message status-" + type + " show";
 
     setTimeout(() => {
       statusElement.className = "status-message";
@@ -1018,23 +1068,21 @@ function renderYouTubers() {
     .map((youtuber) => {
       const avatarUrl = youtuber.image_url || generateAvatar(youtuber.name);
       const tagsHtml = youtuber.tags
-        .map((tag) => \`<span class="tag">\${escapeHtml(tag)}</span>\`)
+        .map((tag) => "<span class='tag'>" + escapeHtml(tag) + "</span>")
         .join("");
       const actionsHtml = isAuthenticated
-        ? \`<div class="card-actions">
-                <button class="btn btn-primary" onclick="editYouTuber(\${youtuber.youtuber_id})">Edit</button>
-                <button class="btn btn-danger" onclick="deleteYouTuber(\${youtuber.youtuber_id})">Delete</button>
-            </div>\`
+        ? "<div class='card-actions'>" +
+                "<button class='btn btn-primary' onclick='editYouTuber(" + youtuber.youtuber_id + ")'>Edit</button>" +
+                "<button class='btn btn-danger' onclick='deleteYouTuber(" + youtuber.youtuber_id + ")'>Delete</button>" +
+            "</div>"
         : "";
 
-      return \`
-            <div class="youtuber-card">
-                <img src="\${avatarUrl}" alt="\${escapeHtml(youtuber.name)}" class="youtuber-image">
-                <h3 class="youtuber-name">\${escapeHtml(youtuber.name)}</h3>
-                <div class="youtuber-tags">\${tagsHtml}</div>
-                \${actionsHtml}
-            </div>
-        \`;
+      return "<div class='youtuber-card'>" +
+                "<img src='" + avatarUrl + "' alt='" + escapeHtml(youtuber.name) + "' class='youtuber-image'>" +
+                "<h3 class='youtuber-name'>" + escapeHtml(youtuber.name) + "</h3>" +
+                "<div class='youtuber-tags'>" + tagsHtml + "</div>" +
+                actionsHtml +
+            "</div>";
     })
     .join("");
 }
@@ -1042,7 +1090,7 @@ function renderYouTubers() {
 // Generate avatar SVG
 function generateAvatar(name) {
   const initial = name.charAt(0).toUpperCase();
-  return \`data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="40" r="40" fill="%23ddd"/><text x="40" y="45" text-anchor="middle" font-size="16" fill="%23999">\${initial}</text></svg>\`;
+  return "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><circle cx='40' cy='40' r='40' fill='%23ddd'/><text x='40' y='45' text-anchor='middle' font-size='16' fill='%23999'>" + initial + "</text></svg>";
 }
 
 // Escape HTML to prevent XSS
@@ -1087,10 +1135,10 @@ async function deleteYouTuber(id) {
     const csrfResponse = await fetch("/api/auth/csrf");
     const csrfData = await csrfResponse.json();
 
-    const response = await fetch(\`/api/youtubers/\${id}\`, {
+    const response = await fetch("/api/youtubers/" + id, {
       method: "DELETE",
       headers: {
-        Authorization: \`Bearer \${authToken}\`,
+        Authorization: "Bearer " + authToken,
         "X-CSRF-Token": csrfData.csrfToken,
       },
     });
@@ -1116,13 +1164,13 @@ async function saveYouTuber(formData) {
     const csrfResponse = await fetch("/api/auth/csrf");
     const csrfData = await csrfResponse.json();
 
-    const url = editingId ? \`/api/youtubers/\${editingId}\` : "/api/youtubers";
+    const url = editingId ? "/api/youtubers/" + editingId : "/api/youtubers";
     const method = editingId ? "PUT" : "POST";
 
     const response = await fetch(url, {
       method,
       headers: {
-        Authorization: \`Bearer \${authToken}\`,
+        Authorization: "Bearer " + authToken,
         "X-CSRF-Token": csrfData.csrfToken,
       },
       body: formData,
@@ -1132,7 +1180,7 @@ async function saveYouTuber(formData) {
 
     if (response.ok) {
       showStatus(
-        \`YouTuber \${editingId ? "updated" : "created"} successfully\`,
+        "YouTuber " + (editingId ? "updated" : "created") + " successfully",
         "success"
       );
       hideYouTuberModal();
@@ -1151,7 +1199,7 @@ function showStatus(message, type) {
   const statusElement = document.getElementById("statusMessage");
   if (statusElement) {
     statusElement.textContent = message;
-    statusElement.className = \`status-message status-\${type} show\`;
+    statusElement.className = "status-message status-" + type + " show";
 
     setTimeout(() => {
       statusElement.className = "status-message";
@@ -1321,24 +1369,22 @@ function renderVideos() {
       const youtuberName = youtuber ? youtuber.name : "Unknown";
       const thumbnailUrl = video.thumbnail_url || "https://via.placeholder.com/320x180?text=No+Thumbnail";
       const actionsHtml = isAuthenticated
-        ? \`<div class="card-actions">
-                <button class="btn btn-primary" onclick="editVideo(\${video.video_id})">Edit</button>
-                <button class="btn btn-danger" onclick="deleteVideo(\${video.video_id})">Delete</button>
-            </div>\`
+        ? "<div class='card-actions'>" +
+                "<button class='btn btn-primary' onclick='editVideo(" + video.video_id + ")'>Edit</button>" +
+                "<button class='btn btn-danger' onclick='deleteVideo(" + video.video_id + ")'>Delete</button>" +
+            "</div>"
         : "";
 
-      return \`
-            <div class="video-card">
-                <img src="\${thumbnailUrl}" alt="\${escapeHtml(video.title)}" class="video-thumbnail">
-                <h3 class="video-title">\${escapeHtml(video.title)}</h3>
-                <div class="video-meta">
-                    <span>by \${escapeHtml(youtuberName)}</span>
-                </div>
-                \${video.description ? \`<p class="video-description">\${escapeHtml(video.description)}</p>\` : ''}
-                <a href="\${video.url}" target="_blank" class="btn btn-primary" style="margin-top: 1rem;">Watch Video</a>
-                \${actionsHtml}
-            </div>
-        \`;
+      return "<div class='video-card'>" +
+                "<img src='" + thumbnailUrl + "' alt='" + escapeHtml(video.title) + "' class='video-thumbnail'>" +
+                "<h3 class='video-title'>" + escapeHtml(video.title) + "</h3>" +
+                "<div class='video-meta'>" +
+                    "<span>by " + escapeHtml(youtuberName) + "</span>" +
+                "</div>" +
+                (video.description ? "<p class='video-description'>" + escapeHtml(video.description) + "</p>" : "") +
+                "<a href='" + video.url + "' target='_blank' class='btn btn-primary' style='margin-top: 1rem;'>Watch Video</a>" +
+                actionsHtml +
+            "</div>";
     })
     .join("");
 }
@@ -1387,10 +1433,10 @@ async function deleteVideo(id) {
     const csrfResponse = await fetch("/api/auth/csrf");
     const csrfData = await csrfResponse.json();
 
-    const response = await fetch(\`/api/videos/\${id}\`, {
+    const response = await fetch("/api/videos/" + id, {
       method: "DELETE",
       headers: {
-        Authorization: \`Bearer \${authToken}\`,
+        Authorization: "Bearer " + authToken,
         "X-CSRF-Token": csrfData.csrfToken,
       },
     });
@@ -1416,14 +1462,14 @@ async function saveVideo(videoData) {
     const csrfResponse = await fetch("/api/auth/csrf");
     const csrfData = await csrfResponse.json();
 
-    const url = editingId ? \`/api/videos/\${editingId}\` : "/api/videos";
+    const url = editingId ? "/api/videos/" + editingId : "/api/videos";
     const method = editingId ? "PUT" : "POST";
 
     const response = await fetch(url, {
       method,
       headers: {
         "Content-Type": "application/json",
-        Authorization: \`Bearer \${authToken}\`,
+        Authorization: "Bearer " + authToken,
         "X-CSRF-Token": csrfData.csrfToken,
       },
       body: JSON.stringify(videoData),
@@ -1433,7 +1479,7 @@ async function saveVideo(videoData) {
 
     if (response.ok) {
       showStatus(
-        \`Video \${editingId ? "updated" : "created"} successfully\`,
+        "Video " + (editingId ? "updated" : "created") + " successfully",
         "success"
       );
       hideVideoModal();
@@ -1452,7 +1498,7 @@ function showStatus(message, type) {
   const statusElement = document.getElementById("statusMessage");
   if (statusElement) {
     statusElement.textContent = message;
-    statusElement.className = \`status-message status-\${type} show\`;
+    statusElement.className = "status-message status-" + type + " show";
 
     setTimeout(() => {
       statusElement.className = "status-message";
@@ -1503,6 +1549,116 @@ document.addEventListener("DOMContentLoaded", function () {
   return c.text(js, 200, {
     "Content-Type": "application/javascript",
   });
+});
+
+// Test page to debug issues
+app.get('/test', async (c) => {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 2rem; }
+        .btn { padding: 1rem; margin: 1rem; font-size: 1rem; cursor: pointer; }
+        .modal { display: none; position: fixed; top: 50%; left: 50%; 
+                transform: translate(-50%, -50%); background: white; 
+                padding: 2rem; border: 1px solid #ccc; z-index: 1000; }
+        [data-theme="dark"] { background: #333; color: white; }
+        [data-theme="dark"] .modal { background: #444; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Theme & Login Test</h1>
+    <button id="themeToggle" class="btn" onclick="toggleTheme()">🌙 Toggle Theme</button>
+    <button id="loginBtn" class="btn" onclick="showLoginModal()">📝 Show Login Modal</button>
+    
+    <div id="loginModal" class="modal">
+        <h3>Login Modal</h3>
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Login</button>
+        <button onclick="hideLoginModal()">Cancel</button>
+    </div>
+    
+    <div id="status"></div>
+    
+    <script>
+        // Theme management
+        function toggleTheme() {
+            console.log('toggleTheme called');
+            const current = document.documentElement.getAttribute('data-theme');
+            const newTheme = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            document.getElementById('themeToggle').textContent = newTheme === 'dark' ? '☀️ Toggle Theme' : '🌙 Toggle Theme';
+            showStatus('Theme changed to ' + newTheme, 'success');
+        }
+        
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        document.getElementById('themeToggle').textContent = savedTheme === 'dark' ? '☀️ Toggle Theme' : '🌙 Toggle Theme';
+        
+        // Login modal
+        function showLoginModal() {
+            console.log('showLoginModal called');
+            document.getElementById('loginModal').style.display = 'block';
+            showStatus('Login modal opened', 'info');
+        }
+        
+        function hideLoginModal() {
+            console.log('hideLoginModal called');
+            document.getElementById('loginModal').style.display = 'none';
+        }
+        
+        // Login function
+        async function login() {
+            const password = document.getElementById('password').value;
+            if (!password) {
+                showStatus('Enter a password', 'error');
+                return;
+            }
+            
+            try {
+                // Get CSRF token
+                const csrfResponse = await fetch('/api/auth/csrf');
+                const csrfData = await csrfResponse.json();
+                
+                showStatus('Got CSRF token: ' + csrfData.csrfToken.substring(0, 20) + '...', 'info');
+                
+                // Try login
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password, csrf_token: csrfData.csrfToken })
+                });
+                
+                const data = await response.json();
+                
+                if (data.token) {
+                    showStatus('Login successful! Token: ' + data.token.substring(0, 20) + '...', 'success');
+                    hideLoginModal();
+                } else {
+                    showStatus('Login failed: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showStatus('Login error: ' + error.message, 'error');
+            }
+        }
+        
+        function showStatus(message, type) {
+            const colors = { success: 'green', error: 'red', info: 'blue' };
+            document.getElementById('status').innerHTML = 
+                '<div style="color: ' + colors[type] + '; margin: 1rem 0;">' + message + '</div>';
+        }
+        
+        console.log('Test page loaded');
+    </script>
+</body>
+</html>`;
+  
+  return c.html(html);
 });
 
 // Health check

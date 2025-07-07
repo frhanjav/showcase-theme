@@ -48,13 +48,7 @@ app.use("/api/*", rateLimitMiddleware());
 // CSRF protection for state-changing operations
 app.use("/api/*", csrfMiddleware());
 
-// API Routes
-app.route("/api/auth", authRouter);
-app.route("/api/youtubers", youtubersRouter);
-app.route("/api/videos", videosRouter);
-app.route("/api/utils", utilsRouter);
-
-// Authentication middleware for protected routes (after auth routes)
+// Authentication middleware for protected routes (before routes)
 app.use("/api/youtubers", async (c, next) => {
   if (c.req.method !== "GET") {
     return authMiddleware()(c, next);
@@ -70,6 +64,12 @@ app.use("/api/videos", async (c, next) => {
 });
 
 app.use("/api/utils/*", authMiddleware());
+
+// API Routes
+app.route("/api/auth", authRouter);
+app.route("/api/youtubers", youtubersRouter);
+app.route("/api/videos", videosRouter);
+app.route("/api/utils", utilsRouter);
 
 // Serve images from R2 storage
 app.get("/images/:folder/:filename", async (c) => {
@@ -297,14 +297,14 @@ app.get("/videos", async (c) => {
                     <small class="form-help">We'll automatically extract video information</small>
                 </div>
                 <div class="form-group">
-                    <label for="youtuber_id">YouTuber:</label>
-                    <select id="youtuber_id" name="youtuber_id" required>
-                        <option value="">Select a YouTuber</option>
-                    </select>
-                </div>
-                <div class="form-group">
                     <label for="description">Description:</label>
                     <textarea id="description" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="custom_thumbnail">Custom Thumbnail:</label>
+                    <input type="file" id="custom_thumbnail" name="custom_thumbnail" accept="image/*">
+                    <small class="form-help">Optional: Upload a custom thumbnail or we'll extract one from the video</small>
+                    <img id="thumbnailPreview" style="display: none; max-width: 200px; margin-top: 10px;" />
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="hideVideoModal()">Cancel</button>
@@ -1293,7 +1293,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 app.get("/static/videos.js", async (c) => {
   const js = `let videos = [];
-let youtubers = [];
 let editingId = null;
 let authToken = localStorage.getItem("authToken");
 
@@ -1355,35 +1354,6 @@ async function loadVideos() {
   }
 }
 
-// Load YouTubers for dropdown
-async function loadYouTubersForDropdown() {
-  try {
-    const response = await fetch("/api/youtubers");
-    const data = await response.json();
-
-    if (data.youtubers) {
-      youtubers = data.youtubers;
-      populateYouTuberDropdown();
-    }
-  } catch (error) {
-    console.error("Error loading YouTubers:", error);
-  }
-}
-
-// Populate YouTuber dropdown
-function populateYouTuberDropdown() {
-  const select = document.getElementById("youtuber_id");
-  if (!select) return;
-
-  select.innerHTML = '<option value="">Select a YouTuber</option>';
-  youtubers.forEach((youtuber) => {
-    const option = document.createElement("option");
-    option.value = youtuber.youtuber_id;
-    option.textContent = youtuber.name;
-    select.appendChild(option);
-  });
-}
-
 // Render Videos
 function renderVideos() {
   const grid = document.getElementById("videosGrid");
@@ -1397,11 +1367,12 @@ function renderVideos() {
 
   const isAuthenticated = !!authToken;
 
-  grid.innerHTML = videos
+  const videosHtml = videos
     .map((video) => {
-      const youtuber = youtubers.find((y) => y.youtuber_id === video.youtuber_id);
-      const youtuberName = youtuber ? youtuber.name : "Unknown";
-      const thumbnailUrl = video.thumbnail_url || "https://via.placeholder.com/320x180?text=No+Thumbnail";
+      const thumbnailUrl = video.thumbnail_url || generateVideoThumbnail();
+      const descriptionHtml = video.description
+        ? "<p class='video-description'>" + escapeHtml(video.description) + "</p>"
+        : "";
       const actionsHtml = isAuthenticated
         ? "<div class='card-actions'>" +
                 "<button class='btn btn-primary' onclick='editVideo(" + video.video_id + ")'>Edit</button>" +
@@ -1410,17 +1381,23 @@ function renderVideos() {
         : "";
 
       return "<div class='video-card'>" +
-                "<img src='" + thumbnailUrl + "' alt='" + escapeHtml(video.title) + "' class='video-thumbnail'>" +
-                "<h3 class='video-title'>" + escapeHtml(video.title) + "</h3>" +
-                "<div class='video-meta'>" +
-                    "<span>by " + escapeHtml(youtuberName) + "</span>" +
+                "<img src='" + thumbnailUrl + "' alt='" + escapeHtml(video.title) + "' class='video-thumbnail clickable-thumbnail' data-url='" + video.url + "'>" +
+                "<div class='video-content'>" +
+                    "<h3 class='video-title'>" + escapeHtml(video.title) + "</h3>" +
+                    descriptionHtml +
+                    "<a href='" + video.url + "' target='_blank' class='video-url'>" + escapeHtml(video.url) + "</a>" +
+                    actionsHtml +
                 "</div>" +
-                (video.description ? "<p class='video-description'>" + escapeHtml(video.description) + "</p>" : "") +
-                "<a href='" + video.url + "' target='_blank' class='btn btn-primary' style='margin-top: 1rem;'>Watch Video</a>" +
-                actionsHtml +
             "</div>";
     })
     .join("");
+
+  grid.innerHTML = videosHtml;
+}
+
+// Generate video thumbnail placeholder
+function generateVideoThumbnail() {
+  return "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='350' height='200' viewBox='0 0 350 200'><rect width='350' height='200' fill='%23ddd'/><text x='175' y='100' text-anchor='middle' font-size='16' fill='%23999'>No Thumbnail</text></svg>";
 }
 
 // Escape HTML to prevent XSS
@@ -1432,9 +1409,15 @@ function escapeHtml(text) {
 
 // Show add modal
 function showAddModal() {
+  if (!authToken) {
+    showStatus("Please login first", "error");
+    return;
+  }
+
   editingId = null;
   document.getElementById("modalTitle").textContent = "Add Video";
   document.getElementById("videoForm").reset();
+  document.getElementById("thumbnailPreview").style.display = "none";
   document.getElementById("videoModal").style.display = "block";
 }
 
@@ -1444,17 +1427,35 @@ function hideVideoModal() {
   editingId = null;
 }
 
+// Close modal
+function closeModal() {
+  hideVideoModal();
+}
+
 // Edit Video
 function editVideo(id) {
+  if (!authToken) {
+    showStatus("Please login first", "error");
+    return;
+  }
+
   const video = videos.find((v) => v.video_id === id);
   if (!video) return;
 
   editingId = id;
   document.getElementById("modalTitle").textContent = "Edit Video";
-  document.getElementById("title").value = video.title;
   document.getElementById("url").value = video.url;
-  document.getElementById("youtuber_id").value = video.youtuber_id;
+  document.getElementById("title").value = video.title;
   document.getElementById("description").value = video.description || "";
+
+  const preview = document.getElementById("thumbnailPreview");
+  if (video.thumbnail_url) {
+    preview.src = video.thumbnail_url;
+    preview.style.display = "block";
+  } else {
+    preview.style.display = "none";
+  }
+
   document.getElementById("videoModal").style.display = "block";
 }
 
@@ -1490,7 +1491,7 @@ async function deleteVideo(id) {
 }
 
 // Save Video
-async function saveVideo(videoData) {
+async function saveVideo(formData) {
   try {
     // Get CSRF token
     const csrfResponse = await fetch("/api/auth/csrf");
@@ -1502,11 +1503,10 @@ async function saveVideo(videoData) {
     const response = await fetch(url, {
       method,
       headers: {
-        "Content-Type": "application/json",
         Authorization: "Bearer " + authToken,
         "X-CSRF-Token": csrfData.csrfToken,
       },
-      body: JSON.stringify(videoData),
+      body: formData,
     });
 
     const data = await response.json();
@@ -1553,14 +1553,52 @@ document.addEventListener("DOMContentLoaded", function () {
     videoForm.addEventListener("submit", function (e) {
       e.preventDefault();
       
-      const videoData = {
-        title: document.getElementById("title").value,
-        url: document.getElementById("url").value,
-        youtuber_id: parseInt(document.getElementById("youtuber_id").value),
-        description: document.getElementById("description").value || null,
-      };
-      
-      saveVideo(videoData);
+      if (!authToken) {
+        showStatus("Please login first", "error");
+        return;
+      }
+
+      const saveBtn = document.querySelector('#videoForm button[type="submit"]');
+      const originalText = saveBtn.textContent;
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving...";
+
+      try {
+        const formData = new FormData();
+        formData.append("url", document.getElementById("url").value);
+        formData.append("title", document.getElementById("title").value);
+        formData.append("description", document.getElementById("description").value);
+
+        const thumbnailFile = document.getElementById("custom_thumbnail").files[0];
+        if (thumbnailFile) {
+          formData.append("custom_thumbnail", thumbnailFile);
+        }
+
+        saveVideo(formData);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalText;
+      }
+    });
+  }
+
+  // Thumbnail preview
+  const thumbnailInput = document.getElementById("custom_thumbnail");
+  if (thumbnailInput) {
+    thumbnailInput.addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      const preview = document.getElementById("thumbnailPreview");
+
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          preview.src = e.target.result;
+          preview.style.display = "block";
+        };
+        reader.readAsDataURL(file);
+      } else {
+        preview.style.display = "none";
+      }
     });
   }
 
@@ -1576,8 +1614,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Initialize
   checkAuth();
-  loadYouTubersForDropdown();
   loadVideos();
+  
+  // Add click listeners for video thumbnails (delegated event listener)
+  document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('clickable-thumbnail')) {
+      const url = e.target.getAttribute('data-url');
+      if (url) {
+        window.open(url, '_blank');
+      }
+    }
+  });
 });`;
 
   return c.text(js, 200, {
